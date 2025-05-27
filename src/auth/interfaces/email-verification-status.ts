@@ -1,0 +1,5 @@
+export enum EmailVerificationStatus {
+    VERIFIED = 'VERIFIED',
+    ALREADY_VERIFIED = 'ALREADY_VERIFIED',
+    INVALID_OR_EXPIRED = 'INVALID_OR_EXPIRED',
+}

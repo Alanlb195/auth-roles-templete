@@ -1,11 +1,14 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateUserDto, LoginUserDto } from './dto';
+import { CreateUserDto, LoginUserDto, RequestPasswordResetDto, ResetPasswordDto } from './dto';
 import { Auth } from './decorators/auth.decorator';
 import { GetUser } from './decorators/get-user.decorator';
 import { User } from '@prisma/client';
 import { ValidRoles } from './interfaces';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
+import { allowedRedirects } from '@shared/constants/allowed-redirects';
+import { EmailVerificationStatus } from './interfaces/email-verification-status';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -43,6 +46,50 @@ export class AuthController {
         @GetUser() user: User
     ) {
         return this.authService.checkAuthStatus(user);
+    }
+
+
+    @Get('verify-email')
+    @ApiOperation({ summary: 'Verify email using token sent to user' })
+    @ApiQuery({ name: 'token', required: true })
+    @ApiQuery({ name: 'successUrl', required: false })
+    @ApiQuery({ name: 'failureUrl', required: false })
+    @ApiQuery({ name: 'alreadyVerifiedUrl', required: false })
+    @ApiResponse({ status: 200, description: 'Email verified successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+    async verifyEmail(
+        @Res() res: Response,
+        @Query('token') token: string,
+        @Query('successUrl') successUrl?: string,
+        @Query('failureUrl') failureUrl?: string,
+        @Query('alreadyVerifiedUrl') alreadyVerifiedUrl?: string,
+    ) {
+        const redirectUrl = await this.authService.getRedirectAfterVerification({
+            token,
+            successUrl,
+            failureUrl,
+            alreadyVerifiedUrl,
+        });
+
+        return res.redirect(redirectUrl);
+    }
+
+
+    @Post('request-password-reset')
+    @ApiOperation({ summary: 'Request a password reset link' })
+    @ApiBody({ type: RequestPasswordResetDto })
+    @ApiResponse({ status: 200, description: 'Reset email sent if account exists' })
+    requestPasswordReset(@Body() body: RequestPasswordResetDto) {
+        return this.authService.requestPasswordReset(body.email);
+    }
+
+    @Post('reset-password')
+    @ApiOperation({ summary: 'Reset password using the reset token' })
+    @ApiBody({ type: ResetPasswordDto })
+    @ApiResponse({ status: 200, description: 'Password reset successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+    resetPassword(@Body() body: ResetPasswordDto) {
+        return this.authService.resetPassword(body.token, body.newPassword);
     }
 
     @Get('private')

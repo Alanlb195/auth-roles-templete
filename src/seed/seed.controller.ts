@@ -18,8 +18,8 @@ export class SeedController {
         description: 'Deletes all existing data and inserts fresh seed data. This route should only be used in development environments.'
     })
     runSeed() {
-        const stage = this.configService.get<string>('STAGE');
-        if (stage !== 'dev')
+        const stage = this.configService.get<string>('NODE_ENV');
+        if (stage !== 'development')
             throw new ForbiddenException('Seeding only allowed in development');
 
         return this.seedService.runSeed();

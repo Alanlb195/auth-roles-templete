@@ -24,9 +24,9 @@ import { CustomMailerModule } from 'src/mailer/mailer.module';
       ],
       useFactory: (configService: ConfigService) => {
         return {
-          secret: configService.get('JWT_SECRET'),
+          secret: configService.get<string>('JWT_SECRET'),
           signOptions: {
-            expiresIn: '2h'
+            expiresIn: configService.get<string>('JWT_ACCESS_EXPIRATION')
           }
         }
       }
