@@ -33,7 +33,8 @@ export class SeedService {
                     email: user.email,
                     fullName: user.fullName,
                     password: bcrypt.hashSync(user.password, 10),
-                    role: user.roles[0] as any
+                    role: user.roles[0] as any,
+                    isActive: user.active,
                 },
             });
         }

@@ -1,8 +1,9 @@
 version: '3.8'
 
 services:
-  # Postgres DB
-  orders-db:
+
+  #? Postgres DB - Note: change home by your user or change all volume route
+  db-service:
     image: postgres:17.4
     restart: always
     ports:
@@ -13,17 +14,17 @@ services:
       POSTGRES_DB: auth-db
     container_name: auth-db
     volumes:
-      - ./postgres:/var/lib/postgresql/data
+      - /Users/home/Desktop/docker-data/db-data:/var/lib/postgresql/data
     networks:
       - nestjs-network
 
-  # Mailpit configuration
+  #? Mailpit configuration - Note: change 'home' by your user or change all volume route
   mailpit:
     image: axllent/mailpit:v1.25
     container_name: mailpit
     restart: unless-stopped
     volumes:
-      - ./data:/data
+      - /Users/home/Desktop/docker-data/mailpit-data:/data
     ports:
       - 8025:8025
       - 1025:1025
@@ -62,6 +63,19 @@ services:
   #   networks:
   #     - nestjs-network
 
+  redis:
+    image: redis:8.0.1
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - nestjs-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Uncomment if you want to run the app in docker
   # api:
   #   build:
@@ -72,7 +86,7 @@ services:
   #   ports:
   #     - "3000:3000"
   #   depends_on:
-  #     - orders-db
+  #     - db-service
   #     - mailpit
   #     # - minio
   #   env_file:

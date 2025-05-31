@@ -7,8 +7,6 @@ import { User } from '@prisma/client';
 import { ValidRoles } from './interfaces';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
-import { allowedRedirects } from '@shared/constants/allowed-redirects';
-import { EmailVerificationStatus } from './interfaces/email-verification-status';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -55,8 +53,7 @@ export class AuthController {
     @ApiQuery({ name: 'successUrl', required: false })
     @ApiQuery({ name: 'failureUrl', required: false })
     @ApiQuery({ name: 'alreadyVerifiedUrl', required: false })
-    @ApiResponse({ status: 200, description: 'Email verified successfully' })
-    @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+    @ApiResponse({ status: 200, description: 'Redirect based on the url links' })
     async verifyEmail(
         @Res() res: Response,
         @Query('token') token: string,
@@ -66,11 +63,10 @@ export class AuthController {
     ) {
         const redirectUrl = await this.authService.getRedirectAfterVerification({
             token,
-            successUrl,
-            failureUrl,
-            alreadyVerifiedUrl,
+            successUrl: decodeURIComponent(successUrl),
+            failureUrl: decodeURIComponent(failureUrl),
+            alreadyVerifiedUrl: decodeURIComponent(alreadyVerifiedUrl),
         });
-
         return res.redirect(redirectUrl);
     }
 
@@ -79,8 +75,8 @@ export class AuthController {
     @ApiOperation({ summary: 'Request a password reset link' })
     @ApiBody({ type: RequestPasswordResetDto })
     @ApiResponse({ status: 200, description: 'Reset email sent if account exists' })
-    requestPasswordReset(@Body() body: RequestPasswordResetDto) {
-        return this.authService.requestPasswordReset(body.email);
+    requestPasswordReset(@Body() requestPasswordResetDto: RequestPasswordResetDto) {
+        return this.authService.requestPasswordReset(requestPasswordResetDto);
     }
 
     @Post('reset-password')
@@ -88,8 +84,8 @@ export class AuthController {
     @ApiBody({ type: ResetPasswordDto })
     @ApiResponse({ status: 200, description: 'Password reset successfully' })
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
-    resetPassword(@Body() body: ResetPasswordDto) {
-        return this.authService.resetPassword(body.token, body.newPassword);
+    resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+        return this.authService.resetPassword(resetPasswordDto);
     }
 
     @Get('private')

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Role, User } from '@prisma/client';
-import { CreateUserDto, LoginUserDto } from './dto';
+import { CreateUserDto, LoginUserDto, RequestPasswordResetDto, ResetPasswordDto } from './dto';
 import * as bcrypt from "bcryptjs";
 import { PrismaService } from 'src/prisma/prisma.service';
 import { JwtPayload } from './interfaces';
@@ -8,8 +8,8 @@ import { JwtService } from '@nestjs/jwt';
 import { MailService } from 'src/mailer/mailer.service';
 import { randomBytes } from 'crypto';
 import { EmailVerificationStatus } from './interfaces/email-verification-status';
-import { allowedRedirects } from '@shared/constants/allowed-redirects';
-
+import { EmailVerificationOptions } from '@shared/interfaces/email-verification-options';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
@@ -18,12 +18,13 @@ export class AuthService {
         private readonly prisma: PrismaService,
         private readonly jwtService: JwtService,
         private readonly mailService: MailService,
+        private readonly configService: ConfigService,
     ) { }
 
 
     async createUser(createUserDto: CreateUserDto) {
 
-        const { email, fullName, password } = createUserDto;
+        const { email, fullName, password, ...data } = createUserDto;
 
         const userExists = await this.prisma.user.findUnique({ where: { email } });
         if (userExists) {
@@ -53,11 +54,16 @@ export class AuthService {
         });
 
         // Send email verification link
+        const emailLinkOptions: EmailVerificationOptions = {
+            ...data,
+            token
+        };
+
         if (user) {
             try {
-                await this.mailService.sendEmailWithVerificationLink(user, token, 'verify-email');
+                await this.mailService.sendEmailWithVerificationLink(user, 'verify-email', emailLinkOptions);
             } catch (error) {
-                console.error('Error sending welcome email:', error.message);
+                console.error('Error in sendEmailWithVerificationLink: ', error.message);
             }
         }
 
@@ -127,7 +133,10 @@ export class AuthService {
         }
     }
 
-    async requestPasswordReset(email: string) {
+    async requestPasswordReset(requestPasswordResetDto: RequestPasswordResetDto) {
+
+        const { email, redirectUrl } = requestPasswordResetDto;
+
         const user = await this.prisma.user.findUnique({ where: { email } });
 
         if (!user) {
@@ -146,12 +155,15 @@ export class AuthService {
             },
         });
 
-        await this.mailService.sendEmailWithResetPasswordLink(user, token);
+        await this.mailService.sendEmailWithResetPasswordLink(user, token, redirectUrl);
 
         return { message: 'Email send, please check your inbox' };
     }
 
-    async resetPassword(token: string, newPassword: string) {
+    async resetPassword(resetPasswordDto: ResetPasswordDto) {
+
+        const { newPassword, token } = resetPasswordDto;
+
         const resetRecord = await this.prisma.passwordReset.findUnique({ where: { token } });
 
         if (!resetRecord || resetRecord.usedAt || resetRecord.expiresAt < new Date()) {
@@ -174,22 +186,19 @@ export class AuthService {
         return { message: 'Password updated correctly' };
     }
 
+    private getJwt(payload: JwtPayload) {
+        const token = this.jwtService.sign(payload);
+        return token;
+    }
 
-    async getRedirectAfterVerification(params: {
-        token: string;
-        successUrl?: string;
-        failureUrl?: string;
-        alreadyVerifiedUrl?: string;
-    }): Promise<string> {
+    async getRedirectAfterVerification(params: EmailVerificationOptions): Promise<string> {
         const { token, successUrl, failureUrl, alreadyVerifiedUrl } = params;
 
-        const defaultSuccess = 'https://www.google.com/';
-        const defaultFailure = 'https://www.facebook.com/';
-        const defaultAlreadyVerified = 'https://www.youtube.com/';
+        const frontBaseUrl = this.configService.get<string>('FRONTEND_BASE_URL');
 
-        const finalSuccessUrl = allowedRedirects.includes(successUrl) ? successUrl : defaultSuccess;
-        const finalFailureUrl = allowedRedirects.includes(failureUrl) ? failureUrl : defaultFailure;
-        const finalAlreadyVerifiedUrl = allowedRedirects.includes(alreadyVerifiedUrl) ? alreadyVerifiedUrl : defaultAlreadyVerified;
+        const finalSuccessUrl = this.isAllowed(successUrl) ? successUrl! : frontBaseUrl;
+        const finalFailureUrl = this.isAllowed(failureUrl) ? failureUrl! : frontBaseUrl;
+        const finalAlreadyVerifiedUrl = this.isAllowed(alreadyVerifiedUrl) ? alreadyVerifiedUrl! : frontBaseUrl;
 
         const status = await this.verifyEmail(token);
 
@@ -204,10 +213,19 @@ export class AuthService {
         }
     }
 
-    private getJwt(payload: JwtPayload) {
-        const token = this.jwtService.sign(payload);
-        return token;
+    isAllowed(url?: string): boolean {
+        if (!url) return false;
+        try {
+            const { origin, pathname } = new URL(decodeURIComponent(url));
+            const normalized = `${origin}${pathname.endsWith('/') ? pathname : pathname + '/'}`;
+
+            const allowedUrl = this.configService.get<string>('FRONTEND_BASE_URL');
+            return normalized.includes(allowedUrl);
+        } catch {
+            return false;
+        }
     }
+
 
     private async returnJwtUser(user: User) {
         const token = this.getJwt({ id: user.id });

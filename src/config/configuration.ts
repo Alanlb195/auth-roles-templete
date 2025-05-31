@@ -2,6 +2,8 @@ export default () => ({
     PORT: parseInt(process.env.PORT, 10) || 3000,
     NODE_ENV: process.env.STAGE,
     HOST_API: process.env.HOST_API,
+    FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL,
+
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
     JWT_ACCESS_EXPIRATION: process.env.JWT_ACCESS_EXPIRATION,
