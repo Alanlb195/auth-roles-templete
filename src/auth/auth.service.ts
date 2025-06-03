@@ -21,7 +21,6 @@ export class AuthService {
         private readonly configService: ConfigService,
     ) { }
 
-
     async createUser(createUserDto: CreateUserDto) {
 
         const { email, fullName, password, ...data } = createUserDto;
@@ -61,7 +60,7 @@ export class AuthService {
 
         if (user) {
             try {
-                await this.mailService.sendEmailWithVerificationLink(user, 'verify-email', emailLinkOptions);
+                await this.mailService.sendEmailWithVerificationLink(user, emailLinkOptions);
             } catch (error) {
                 console.error('Error in sendEmailWithVerificationLink: ', error.message);
             }
@@ -74,7 +73,6 @@ export class AuthService {
     async checkAuthStatus(user: User) {
         return this.returnJwtUser(user);
     }
-
 
     async loginUser(loginUserDto: LoginUserDto) {
 
@@ -95,8 +93,6 @@ export class AuthService {
 
         return this.returnJwtUser(user);
     }
-
-
 
     async verifyEmail(token: string): Promise<EmailVerificationStatus> {
 
@@ -225,7 +221,6 @@ export class AuthService {
             return false;
         }
     }
-
 
     private async returnJwtUser(user: User) {
         const token = this.getJwt({ id: user.id });

@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { google } from 'googleapis';
-import { MailService } from './mailer.service';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { join } from 'path';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+
+import { MailService } from './mailer.service';
+import { SendMassiveEmailUseCase, SendUserCreatedEmailUseCase, SendResetPasswordEmailUseCase, SendVerificationEmailUseCase } from './use-cases';
 
 const OAuth2 = google.auth.OAuth2;
 
@@ -76,7 +78,15 @@ const OAuth2 = google.auth.OAuth2;
       },
     }),
   ],
-  providers: [MailService],
+  providers: [
+    MailService,
+
+    // use cases
+    SendMassiveEmailUseCase,
+    SendUserCreatedEmailUseCase,
+    SendResetPasswordEmailUseCase,
+    SendVerificationEmailUseCase
+  ],
   exports: [MailService],
 })
 export class CustomMailerModule { }

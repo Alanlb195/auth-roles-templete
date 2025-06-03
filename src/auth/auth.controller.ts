@@ -1,18 +1,28 @@
-import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { CreateUserDto, LoginUserDto, RequestPasswordResetDto, ResetPasswordDto } from './dto';
 import { Auth } from './decorators/auth.decorator';
 import { GetUser } from './decorators/get-user.decorator';
 import { User } from '@prisma/client';
 import { ValidRoles } from './interfaces';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Response, Express } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+import { EmailService as EmailWorker } from 'src/jobs/email/email.service';
+import { UserService as UsersWorker } from 'src/jobs/user/user.service';
+import { MassiveEmailDto } from 'src/jobs/email/dtos/massive-email.dto';
+
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
 
-    constructor(private readonly authService: AuthService) { }
+    constructor(
+        private readonly authService: AuthService,
+        private readonly emailWorker: EmailWorker,
+        private readonly usersWorker: UsersWorker,
+    ) { }
 
 
     @Post('register')
@@ -113,4 +123,39 @@ export class AuthController {
             user,
         };
     }
+
+    @Post('send-massive-email')
+    @ApiOperation({ summary: 'Send massive email' })
+    @ApiResponse({ status: 201, description: 'Massive email job successfully enqueued.' })
+    sendMassiveEmail(
+        @Body() massiveEmailDto: MassiveEmailDto
+    ) {
+        return this.emailWorker.enqueueMassiveEmailJob(massiveEmailDto);
+    }
+
+
+    @Post('import-users')
+    @ApiOperation({ summary: 'Import users massive from excel file (xlsx)' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        description: 'Excel (.xlsx) file with columns: email, fullName, role (USER | ADMIN)',
+        schema: {
+            type: 'object',
+            properties: {
+                file: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'File queued correctly to import users bulk from xlsx',
+    })
+    @UseInterceptors(FileInterceptor('file'))
+    async importUsers(@UploadedFile() file: Express.Multer.File) {
+        return this.usersWorker.enqueueImportUsersJob(file.buffer);
+    }
+
 }

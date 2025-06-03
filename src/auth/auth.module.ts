@@ -6,6 +6,7 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt-strategy';
 import { CustomMailerModule } from 'src/mailer/mailer.module';
+import { JobsModule } from 'src/jobs/jobs.module';
 
 @Module({
   providers: [AuthService, JwtStrategy],
@@ -32,6 +33,7 @@ import { CustomMailerModule } from 'src/mailer/mailer.module';
       }
     }),
     CustomMailerModule,
+    JobsModule
   ],
   exports: [JwtStrategy, PassportModule, JwtModule]
 })
